@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: eso-webook-cleanup-hook-post-delete
+  annotations:
+    "helm.sh/hook": post-delete
+    "helm.sh/hook-delete-policy": hook-succeeded,hook-failed
+spec:
+  template:
+    spec:
+      serviceAccount: golang-external-secrets
+      containers:
+        - name: oc
+          image: quay.io/hybridcloudpatterns/imperative-container:v1
+          command:
+            - sh
+            - '-c'
+            - >-
+              oc delete validatingwebhookconfiguration secretstore-validate;
+              oc delete validatingwebhookconfiguration externalsecret-validate;
+      restartPolicy: Never
+  backoffLimit: 2
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: webhook-cleanup-role
+rules:
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  #- mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
+  verbs:
+  - list
+  - get
+  - update
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: role-webgook-cleanup-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: webhook-cleanup-role
+subjects:
+- kind: ServiceAccount
+  name: golang-external-secrets
+  namespace: golang-external-secrets
+
